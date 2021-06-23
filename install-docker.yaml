@@ -1,0 +1,62 @@
+---
+  - hosts: docker
+    become: true
+    
+    vars:
+      packages_to_remove:
+        - docker
+        - docker-engine
+        - docker.io
+        - containerd
+        - runc
+     
+    tasks:
+
+      - name: Check if docker installed before
+        shell: "which docker"
+        register: result
+        ignore_errors: true
+
+      - name: Print docker installation info
+        debug:
+          msg: Docker is already installed on {{ result.stdout }}
+        when: result.rc == 0
+
+      - name: Exit on exists
+        meta: end_play
+        when: result.rc == 0
+
+      - name: Remove old packages
+        apt:
+          name: "{{ packages_to_remove }}"
+          state: absent
+
+      - name: Update ubuntu apt cache
+        apt:
+          update_cache: yes
+
+      - name: Install packages to allow apt to use repository over HTTP
+        apt:
+          name: "{{ item }}"
+          state: present
+        loop: 
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+            
+      - name: Add Docker’s official GPG key
+        apt_key:
+          url: https://download.docker.com/linux/ubuntu/gpg
+          state: present
+
+      - name: Add Docker Repository
+        apt_repository:
+          repo: deb https://download.docker.com/linux/ubuntu bionic stable
+          state: present
+
+      - name: Install docker-ce
+        apt:
+          name: docker-ce
+          state: latest
